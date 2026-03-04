@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+  <script>
+  const password = "20260304";
+  let input = "";
+  while (input !== password) {
+    input = prompt("パスワードを入力してください");
+    if (input === null) break; // キャンセルされた場合
+  }
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI講義 受講履歴ダッシュボード</title>
