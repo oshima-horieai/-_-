@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI講義 受講履歴ダッシュボード</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080c14;
+  --surface: #0f1623;
+  --surface2: #162030;
+  --border: #1c2a3a;
+  --accent: #00c8f0;
+  --accent2: #7c3aed;
+  --accent3: #10b981;
+  --accent4: #f59e0b;
+  --red: #ef4444;
+  --text: #dde6f0;
+  --text-dim: #5a7a9a;
+  --text-muted: #1e2f42;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', sans-serif; min-height: 100vh; font-size: 14px; }
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background: radial-gradient(ellipse 70% 40% at 15% 5%, rgba(0,200,240,0.04) 0%, transparent 60%),
+              radial-gradient(ellipse 50% 35% at 85% 90%, rgba(124,58,237,0.04) 0%, transparent 60%);
+  pointer-events: none; z-index: 0;
+}
+.header {
+  position: relative; z-index: 10; padding: 22px 36px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  background: rgba(8,12,20,0.95); backdrop-filter: blur(8px);
+}
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon { width: 36px; height: 36px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 17px; }
+.logo h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+.logo p { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.header-meta { font-size: 11px; color: var(--text-dim); font-family: 'DM Mono', monospace; text-align: right; line-height: 1.8; }
+.header-meta strong { color: var(--accent); }
+.nav { position: relative; z-index: 9; padding: 0 36px; border-bottom: 1px solid var(--border); display: flex; background: var(--surface); overflow-x: auto; }
+.nav-btn { padding: 13px 18px; font-size: 12px; font-weight: 500; color: var(--text-dim); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; font-family: 'Noto Sans JP', sans-serif; transition: all 0.2s; white-space: nowrap; }
+.nav-btn:hover { color: var(--text); }
+.nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.page { display: none; }
+.page.active { display: block; }
+.container { position: relative; z-index: 1; padding: 28px 36px; max-width: 1400px; margin: 0 auto; }
+.kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+@media(max-width:900px){ .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+.kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 18px 20px; position: relative; overflow: hidden; transition: border-color .2s, transform .15s; }
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+.kpi-card.c1::before{background:var(--accent)}.kpi-card.c2::before{background:#a78bfa}.kpi-card.c3::before{background:var(--accent3)}.kpi-card.c4::before{background:var(--accent4)}.kpi-card.c5::before{background:var(--red)}
+.kpi-card:hover { border-color: rgba(0,200,240,.3); transform: translateY(-2px); }
+.kpi-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+.kpi-value { font-size: 24px; font-weight: 700; font-family: 'DM Mono', monospace; line-height: 1; }
+.kpi-card.c1 .kpi-value{color:var(--accent)}.kpi-card.c2 .kpi-value{color:#a78bfa}.kpi-card.c3 .kpi-value{color:var(--accent3)}.kpi-card.c4 .kpi-value{color:var(--accent4)}.kpi-card.c5 .kpi-value{color:#f87171}
+.kpi-sub { font-size: 10px; color: var(--text-dim); margin-top: 5px; }
+.section-title { font-size: 11px; font-weight: 500; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.section-title::before { content: ''; display: inline-block; width: 3px; height: 12px; background: var(--accent); border-radius: 2px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 22px; margin-bottom: 18px; }
+.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+.card-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+@media(max-width:900px){ .card-grid,.card-grid.three{grid-template-columns:1fr} }
+.chart-wrap { position: relative; height: 250px; }
+.chart-wrap.md { height: 290px; }.chart-wrap.lg { height: 340px; }.chart-wrap.xl { height: 400px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; padding: 9px 12px; color: var(--text-dim); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--border); white-space: nowrap; font-weight: 500; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--text-muted); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.015); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-family: 'DM Mono', monospace; }
+.badge.blue{background:rgba(0,200,240,.1);color:var(--accent);border:1px solid rgba(0,200,240,.2)}
+.badge.purple{background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3)}
+.badge.green{background:rgba(16,185,129,.1);color:var(--accent3);border:1px solid rgba(16,185,129,.2)}
+.badge.amber{background:rgba(245,158,11,.1);color:var(--accent4);border:1px solid rgba(245,158,11,.2)}
+.badge.red{background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.2)}
+.rank{font-family:'DM Mono',monospace;color:var(--text-dim);font-size:11px}
+.rank.gold{color:#fbbf24}.rank.silver{color:#94a3b8}.rank.bronze{color:#cd7f32}
+.prog-bg{display:inline-block;width:80px;height:5px;background:var(--border);border-radius:3px;vertical-align:middle;margin-left:6px}
+.prog-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent3),var(--accent))}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-name{width:130px;font-size:12px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-outer{flex:1;height:22px;background:var(--border);border-radius:4px;overflow:hidden;position:relative}
+.bar-inner{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:10px;font-family:'DM Mono',monospace;color:rgba(255,255,255,.85);white-space:nowrap}
+.bar-pct{width:48px;font-size:11px;font-family:'DM Mono',monospace;color:var(--text-dim)}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div>
+      <h1>AI講義 受講履歴ダッシュボード</h1>
+      <p>19名分 視聴データ統合分析</p>
+    </div>
+  </div>
+  <div class="header-meta">
+    受講者 <strong>19名</strong> ／ 総視聴時間 <strong>513時間</strong> ／ 視聴レコード <strong>771件</strong><br>
+    ユニーク動画 <strong>75本</strong> ／ コンテンツリスト <strong>12種</strong> ／ 平均完了率 <strong>65.1%</strong>
+  </div>
+</div>
+<div class="nav">
+  <button class="nav-btn active" onclick="showPage('overview',this)">📈 概要</button>
+  <button class="nav-btn" onclick="showPage('playlist',this)">🗂 コンテンツリスト</button>
+  <button class="nav-btn" onclick="showPage('videos',this)">🎬 人気動画</button>
+  <button class="nav-btn" onclick="showPage('users',this)">👥 受講者別</button>
+</div>
+
+<!-- PAGE: 概要 -->
+<div id="page-overview" class="page active">
+<div class="container">
+  <div class="kpi-grid">
+    <div class="kpi-card c1"><div class="kpi-label">受講者数</div><div class="kpi-value">19名</div><div class="kpi-sub">全員のデータ統合</div></div>
+    <div class="kpi-card c2"><div class="kpi-label">合計視聴時間</div><div class="kpi-value">513h</div><div class="kpi-sub">平均 27時間/人</div></div>
+    <div class="kpi-card c3"><div class="kpi-label">視聴レコード</div><div class="kpi-value">771件</div><div class="kpi-sub">ユニーク動画 75本</div></div>
+    <div class="kpi-card c4"><div class="kpi-label">平均完了率</div><div class="kpi-value">65.1%</div><div class="kpi-sub">全レコード平均</div></div>
+    <div class="kpi-card c5"><div class="kpi-label">完了（100%）</div><div class="kpi-value">316本</div><div class="kpi-sub">全体の 41%</div></div>
+  </div>
+  <div class="card-grid three">
+    <div class="card"><div class="section-title">コンテンツリスト別 視聴時間</div><div class="chart-wrap"><canvas id="c-pl-time"></canvas></div></div>
+    <div class="card"><div class="section-title">コンテンツリスト別 動画本数</div><div class="chart-wrap"><canvas id="c-pl-count"></canvas></div></div>
+    <div class="card"><div class="section-title">完了率の分布</div><div class="chart-wrap"><canvas id="c-completion"></canvas></div></div>
+  </div>
+  <div class="card"><div class="section-title">受講者別 合計視聴時間（右：平均完了率）</div><div id="user-bars"></div></div>
+</div>
+</div>
+
+<!-- PAGE: コンテンツリスト -->
+<div id="page-playlist" class="page">
+<div class="container">
+  <div class="card-grid">
+    <div class="card"><div class="section-title">視聴時間シェア</div><div class="chart-wrap md"><canvas id="c-pl-donut"></canvas></div></div>
+    <div class="card"><div class="section-title">受講者数 × 動画本数（円の大きさ＝視聴時間）</div><div class="chart-wrap md"><canvas id="c-pl-bubble"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="section-title">コンテンツリスト一覧</div>
+    <table><thead><tr><th>#</th><th>コンテンツリスト名</th><th>合計視聴時間</th><th>動画本数</th><th>受講者数</th><th>視聴割合</th></tr></thead>
+    <tbody id="pl-table"></tbody></table>
+  </div>
+</div>
+</div>
+
+<!-- PAGE: 動画別 -->
+<div id="page-videos" class="page">
+<div class="container">
+  <div class="card"><div class="section-title">人気動画 TOP15（合計再生時間）</div><div class="chart-wrap xl"><canvas id="c-video-bar"></canvas></div></div>
+  <div class="card">
+    <div class="section-title">動画別 詳細（上位30本）</div>
+    <table><thead><tr><th>#</th><th>タイトル</th><th>再生回数</th><th>合計再生時間</th><th>動画尺</th><th>平均完了率</th></tr></thead>
+    <tbody id="video-table"></tbody></table>
+  </div>
+</div>
+</div>
+
+<!-- PAGE: 受講者別 -->
+<div id="page-users" class="page">
+<div class="container">
+  <div class="card-grid">
+    <div class="card"><div class="section-title">受講者別 視聴時間</div><div class="chart-wrap lg"><canvas id="c-user-bar"></canvas></div></div>
+    <div class="card"><div class="section-title">受講者別 平均完了率（色：高=緑／中=青／低=赤）</div><div class="chart-wrap lg"><canvas id="c-user-comp"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="section-title">受講者一覧</div>
+    <table><thead><tr><th>#</th><th>受講者名</th><th>合計視聴時間</th><th>視聴本数</th><th>平均完了率</th><th>完了率バー</th></tr></thead>
+    <tbody id="user-table"></tbody></table>
+  </div>
+</div>
+</div>
+
+<script>
+const DATA = {
+  total_min: 30783.2,
+  users: [
+    {name:'阪尾　仁',        min:4054.8, count:87,  comp:0.676},
+    {name:'上岡　美咲',      min:2866.2, count:70,  comp:0.669},
+    {name:'池知　遼',        min:2255.7, count:43,  comp:0.771},
+    {name:'市原　美香',      min:2063.0, count:39,  comp:0.824},
+    {name:'杉山　喜久尚',    min:2025.9, count:42,  comp:0.344},
+    {name:'森山　洋行',      min:1955.5, count:38,  comp:0.746},
+    {name:'山口　颯太',      min:1671.2, count:28,  comp:0.504},
+    {name:'三田村　宏明',    min:1590.6, count:37,  comp:0.703},
+    {name:'畔堂　美幸',      min:1450.1, count:37,  comp:0.609},
+    {name:'山本　亜津子',    min:1427.1, count:38,  comp:0.492},
+    {name:'山口　拓也',      min:1349.3, count:24,  comp:0.893},
+    {name:'松本　国雄',      min:1218.4, count:25,  comp:0.888},
+    {name:'大西　彩里',      min:1125.1, count:20,  comp:0.842},
+    {name:'藤田　晋也',      min:1107.9, count:37,  comp:0.566},
+    {name:'魚住　美月',      min:1101.4, count:18,  comp:0.612},
+    {name:'大屋　貴浩',      min:1000.7, count:16,  comp:0.924},
+    {name:'上田　晴貴',      min:970.9,  count:20,  comp:0.721},
+    {name:'永所　祐希',      min:821.1,  count:19,  comp:0.713},
+    {name:'小橋　清貴',      min:728.4,  count:13,  comp:0.868},
+  ],
+  playlists: [
+    {name:'生成AI総合',                    min:23491, count:455, users:19},
+    {name:'未分類',                        min:5210,  count:113, users:19},
+    {name:'StableDiffusion資格取得１ヶ月', min:4419,  count:83,  users:19},
+    {name:'AIコンサルコース',              min:440,   count:16,  users:6},
+    {name:'初級Zapier業務自動化',          min:370,   count:26,  users:6},
+    {name:'最新トピックス',                min:264,   count:14,  users:7},
+    {name:'ChatGPTコース',                 min:189,   count:7,   users:5},
+    {name:'ChatGPT×Python入門',           min:156,   count:3,   users:1},
+    {name:'biz講義コース',                 min:144,   count:3,   users:1},
+    {name:'Power Automateコース',          min:106,   count:3,   users:1},
+    {name:'ウェビナーアーカイブ',           min:71,    count:3,   users:2},
+    {name:'起業/新規事業コース',           min:67,    count:1,   users:1},
+    {name:'Geminiコース',                  min:66,    count:3,   users:2},
+  ],
+  videos: [
+    {title:'ChatGPT活用法-基礎',              plays:46, min:2579.5, dur:78.1, comp:0.718},
+    {title:'AIと仕事の未来',                  plays:44, min:2504.5, dur:70.4, comp:0.808},
+    {title:'ChatGPT活用法：実践B',            plays:39, min:2237.6, dur:69.9, comp:0.821},
+    {title:'ChatGPTの仕組み',                 plays:36, min:2187.4, dur:74.3, comp:0.818},
+    {title:'ChatGPT活用法-考え方',            plays:39, min:2162.4, dur:65.3, comp:0.849},
+    {title:'ChatGPTのプロンプト入力のコツ',   plays:37, min:1920.6, dur:73.0, comp:0.711},
+    {title:'ChatGPT活用法-実践C',             plays:32, min:1898.5, dur:65.3, comp:0.908},
+    {title:'AIコミュニケーションの考え方',    plays:34, min:1834.5, dur:66.0, comp:0.818},
+    {title:'ChatGPT活用法：応用',             plays:35, min:1704.7, dur:62.9, comp:0.775},
+    {title:'ChatGPT活用法：実践A',            plays:31, min:1620.7, dur:64.0, comp:0.817},
+    {title:'AIの倫理と法律',                  plays:32, min:1604.0, dur:63.3, comp:0.792},
+    {title:'Code Interpreterの活用',          plays:29, min:1579.0, dur:63.6, comp:0.857},
+    {title:'デジタルトランスフォーメーションとは', plays:44, min:896.8, dur:66.0, comp:0.310},
+    {title:'入会後おすすめ3ヶ月コース',       plays:24, min:607.3,  dur:32.8, comp:0.771},
+    {title:'ドラえもんになるな[前半]',         plays:15, min:453.7,  dur:30.3, comp:0.999},
+    {title:'ドラえもんになるな[後半]',         plays:16, min:438.7,  dur:31.2, comp:0.880},
+    {title:'Difyの使い方',                    plays:5,  min:252.3,  dur:53.1, comp:0.950},
+    {title:'ChatGPT活用法-実践D',             plays:4,  min:205.0,  dur:61.7, comp:0.830},
+    {title:'画像生成AIを体験する',             plays:4,  min:195.7,  dur:65.5, comp:0.748},
+    {title:'n8n入門〜概要編〜',               plays:5,  min:147.6,  dur:35.6, comp:0.830},
+    {title:'Zapierメール自動処理①',           plays:4,  min:124.1,  dur:32.9, comp:0.945},
+    {title:'最新トピックス2026/01/15',         plays:6,  min:116.0,  dur:23.6, comp:0.818},
+    {title:'StableDiffusionインストール',      plays:3,  min:114.5,  dur:65.3, comp:0.583},
+    {title:'Python入門アカデミー002',          plays:2,  min:100.5,  dur:75.2, comp:0.670},
+    {title:'Zapierメール自動処理③',           plays:5,  min:96.5,   dur:28.0, comp:0.688},
+    {title:'Dify徹底解説〜概要編〜',           plays:2,  min:96.0,   dur:51.0, comp:0.940},
+    {title:'ChatGPTの概要と全体像',            plays:3,  min:93.9,   dur:31.3, comp:1.000},
+    {title:'Zapierメール自動処理②',           plays:4,  min:90.3,   dur:30.1, comp:0.750},
+    {title:'DX人材に求められるスキル',         plays:1,  min:80.8,   dur:80.8, comp:1.000},
+    {title:'医療AIシフト作成実践',             plays:2,  min:78.2,   dur:39.1, comp:1.000},
+  ],
+  completionDist: {'0-25%':199, '26-50%':78, '51-75%':64, '76-99%':114, '100%完了':316}
+};
+
+const COLORS = ['#00c8f0','#7c3aed','#10b981','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#34d399','#fbbf24','#f87171','#60a5fa','#a78bfa','#4ade80'];
+function toHM(m){ const h=Math.floor(m/60),mi=Math.round(m%60); return h>0?`${h}h ${mi}m`:`${mi}m`; }
+function pct(v){ return `${(v*100).toFixed(0)}%`; }
+const gridColor='#1c2a3a', tickColor='#5a7a9a', labelColor='#8faabf';
+const baseOpts = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:labelColor, font:{size:11}, boxWidth:12, padding:10 } } } };
+
+// ── 概要 ──
+new Chart(document.getElementById('c-pl-time'), {
+  type:'doughnut',
+  data:{ labels:DATA.playlists.map(p=>p.name), datasets:[{ data:DATA.playlists.map(p=>p.min), backgroundColor:COLORS, borderWidth:2, borderColor:'#0f1623' }] },
+  options:{...baseOpts, plugins:{...baseOpts.plugins, tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${toHM(ctx.parsed)} (${(ctx.parsed/DATA.total_min*100).toFixed(1)}%)`}}}}
+});
+new Chart(document.getElementById('c-pl-count'), {
+  type:'bar',
+  data:{ labels:DATA.playlists.map(p=>p.name.length>14?p.name.slice(0,14)+'…':p.name), datasets:[{ data:DATA.playlists.map(p=>p.count), backgroundColor:COLORS, borderRadius:5, borderSkipped:false }] },
+  options:{...baseOpts, indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:tickColor,font:{size:10}},grid:{color:gridColor}}, y:{ticks:{color:labelColor,font:{size:10}},grid:{display:false}} }}
+});
+new Chart(document.getElementById('c-completion'), {
+  type:'bar',
+  data:{ labels:Object.keys(DATA.completionDist), datasets:[{ data:Object.values(DATA.completionDist), backgroundColor:['#ef4444','#f59e0b','#eab308','#06b6d4','#10b981'], borderRadius:6, borderSkipped:false }] },
+  options:{...baseOpts, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.parsed.y}本 (${(ctx.parsed.y/771*100).toFixed(0)}%)`}}}, scales:{ x:{ticks:{color:labelColor,font:{size:11}},grid:{display:false}}, y:{ticks:{color:tickColor,font:{size:10}},grid:{color:gridColor}} }}
+});
+const maxMin = DATA.users[0].min;
+const ubars = document.getElementById('user-bars');
+DATA.users.forEach((u,i)=>{
+  const bp=(u.min/maxMin*100).toFixed(1);
+  const col=i===0?'#fbbf24':i===1?'#94a3b8':i===2?'#cd7f32':'#00c8f0';
+  ubars.innerHTML+=`<div class="bar-row"><div class="bar-name">${u.name.trim()}</div><div class="bar-outer"><div class="bar-inner" style="width:${bp}%;background:${col}22;border-right:2px solid ${col}">${toHM(u.min)}</div></div><div class="bar-pct">${pct(u.comp)}</div></div>`;
+});
+
+// ── コンテンツリスト ──
+new Chart(document.getElementById('c-pl-donut'), {
+  type:'doughnut',
+  data:{ labels:DATA.playlists.map(p=>p.name), datasets:[{ data:DATA.playlists.map(p=>p.min), backgroundColor:COLORS, borderWidth:2, borderColor:'#0f1623' }] },
+  options:{...baseOpts, plugins:{...baseOpts.plugins, tooltip:{callbacks:{label:ctx=>` ${toHM(ctx.parsed)} (${(ctx.parsed/DATA.total_min*100).toFixed(1)}%)`}}}}
+});
+new Chart(document.getElementById('c-pl-bubble'), {
+  type:'bubble',
+  data:{ datasets:DATA.playlists.map((p,i)=>({ label:p.name, data:[{x:p.users,y:p.count,r:Math.max(5,Math.sqrt(p.min/60)*2.8)}], backgroundColor:COLORS[i]+'99', borderColor:COLORS[i], borderWidth:1.5 })) },
+  options:{...baseOpts, plugins:{...baseOpts.plugins, legend:{labels:{font:{size:10},boxWidth:10,padding:7,color:labelColor}}}, scales:{ x:{title:{display:true,text:'受講者数',color:tickColor,font:{size:11}},ticks:{color:tickColor},grid:{color:gridColor}}, y:{title:{display:true,text:'動画本数',color:tickColor,font:{size:11}},ticks:{color:tickColor},grid:{color:gridColor}} }}
+});
+const plt=document.getElementById('pl-table');
+DATA.playlists.forEach((p,i)=>{
+  plt.innerHTML+=`<tr><td><span class="rank${i===0?' gold':i===1?' silver':i===2?' bronze':''}">${i+1}</span></td><td>${p.name}</td><td style="font-family:'DM Mono',monospace">${toHM(p.min)}</td><td style="font-family:'DM Mono',monospace">${p.count}本</td><td><span class="badge ${p.users===19?'green':'blue'}">${p.users}名</span></td><td><span class="prog-bg" style="width:120px"><span class="prog-fill" style="width:${Math.min(100,(p.min/DATA.total_min*100).toFixed(0))}%"></span></span><span style="font-size:10px;color:var(--text-dim);margin-left:6px">${(p.min/DATA.total_min*100).toFixed(1)}%</span></td></tr>`;
+});
+
+// ── 動画別 ──
+const top15=DATA.videos.slice(0,15);
+new Chart(document.getElementById('c-video-bar'), {
+  type:'bar',
+  data:{ labels:top15.map(v=>v.title.length>20?v.title.slice(0,20)+'…':v.title), datasets:[
+    {label:'合計再生時間(分)',data:top15.map(v=>Math.round(v.min)),backgroundColor:'rgba(0,200,240,0.75)',borderRadius:4,borderSkipped:false},
+    {label:'理論最大（尺×再生回数）',data:top15.map(v=>Math.round(v.dur*v.plays)),backgroundColor:'rgba(124,58,237,0.3)',borderRadius:4,borderSkipped:false},
+  ]},
+  options:{...baseOpts, plugins:{...baseOpts.plugins, legend:{labels:{color:labelColor,font:{size:11},boxWidth:12}}}, scales:{x:{ticks:{color:labelColor,font:{size:10}},grid:{display:false}},y:{ticks:{color:tickColor,font:{size:10}},grid:{color:gridColor}}}}
+});
+const vt=document.getElementById('video-table');
+DATA.videos.forEach((v,i)=>{
+  const cp=Math.round(v.comp*100);
+  const bc=cp>=90?'green':cp>=70?'blue':cp>=50?'amber':'red';
+  vt.innerHTML+=`<tr><td><span class="rank${i===0?' gold':i===1?' silver':i===2?' bronze':''}">${i+1}</span></td><td style="max-width:260px;font-size:12px">${v.title}</td><td><span class="badge purple">${v.plays}回</span></td><td style="font-family:'DM Mono',monospace">${toHM(v.min)}</td><td style="font-family:'DM Mono',monospace;color:var(--text-dim)">${v.dur.toFixed(0)}分</td><td><span class="badge ${bc}">${cp}%</span><span class="prog-bg"><span class="prog-fill" style="width:${cp}%"></span></span></td></tr>`;
+});
+
+// ── 受講者別 ──
+new Chart(document.getElementById('c-user-bar'), {
+  type:'bar',
+  data:{ labels:DATA.users.map(u=>u.name.trim()), datasets:[{label:'視聴時間(h)',data:DATA.users.map(u=>(u.min/60).toFixed(1)),backgroundColor:DATA.users.map((_,i)=>i===0?'#fbbf2499':i===1?'#94a3b899':i===2?'#cd7f3299':'rgba(0,200,240,0.6)'),borderRadius:5,borderSkipped:false}]},
+  options:{...baseOpts,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:tickColor,font:{size:10}},grid:{color:gridColor}},y:{ticks:{color:labelColor,font:{size:11}},grid:{display:false}}}}
+});
+new Chart(document.getElementById('c-user-comp'), {
+  type:'bar',
+  data:{ labels:DATA.users.map(u=>u.name.trim()), datasets:[{label:'平均完了率(%)',data:DATA.users.map(u=>(u.comp*100).toFixed(0)),backgroundColor:DATA.users.map(u=>u.comp>=0.85?'rgba(16,185,129,0.7)':u.comp>=0.65?'rgba(0,200,240,0.6)':u.comp>=0.5?'rgba(245,158,11,0.6)':'rgba(239,68,68,0.6)'),borderRadius:5,borderSkipped:false}]},
+  options:{...baseOpts,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{min:0,max:100,ticks:{color:tickColor,font:{size:10},callback:v=>v+'%'},grid:{color:gridColor}},y:{ticks:{color:labelColor,font:{size:11}},grid:{display:false}}}}
+});
+const ut=document.getElementById('user-table');
+DATA.users.forEach((u,i)=>{
+  const cp=Math.round(u.comp*100);
+  const bc=cp>=85?'green':cp>=65?'blue':cp>=50?'amber':'red';
+  ut.innerHTML+=`<tr><td><span class="rank${i===0?' gold':i===1?' silver':i===2?' bronze':''}">${i+1}</span></td><td>${u.name.trim()}</td><td style="font-family:'DM Mono',monospace">${toHM(u.min)}</td><td style="font-family:'DM Mono',monospace">${u.count}本</td><td><span class="badge ${bc}">${cp}%</span></td><td><span class="prog-bg" style="width:100px"><span class="prog-fill" style="width:${cp}%"></span></span></td></tr>`;
+});
+
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
